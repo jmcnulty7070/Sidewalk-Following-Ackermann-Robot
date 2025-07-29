@@ -188,6 +188,121 @@ WantedBy=multi-user.target
 sudo systemctl enable segmav
 ```
 
+# ✅ Sidewalk-Following Robot — Launch Instructions (Jetson + Pixhawk + Camera + LiDAR)
+
+This guide explains how to launch your robot using ROS, MAVROS, LiDAR, and semantic vision control. It blends GPS waypoint navigation, sidewalk-following using AI, and obstacle avoidance via LiDAR and Bendy Ruler.
+
+---
+
+## ✅ LAUNCH ORDER — Step by Step
+
+🔋 **Make sure Jetson Nano and Pixhawk are powered on**, GPS lock is acquired, and camera & LiDAR are plugged in.
+
+---
+
+### 1. Start ROS Core
+
+This is the master node. Keep this terminal open:
+
+```bash
+roscore
+```
+
+---
+
+### 2. Start MAVROS (Jetson ↔ Pixhawk Bridge)
+
+> Replace `/dev/ttyTHS1` with your Jetson's serial port (like `/dev/ttyUSB0` if using a USB adapter).
+
+```bash
+roslaunch mavros px4.launch fcu_url:=/dev/ttyTHS1:57600
+```
+
+---
+
+### 3. Start LiDAR Node
+
+If you're using the **LDROBOT D500**, install their ROS driver. Then:
+
+```bash
+roslaunch ldlidar_stl ldlidar.launch
+```
+
+This publishes `/scan` — the laser data used for Bendy Ruler.
+
+---
+
+### 4. Start LIDAR-to-MAVLink Bridge
+
+This bridges `/scan` to the MAVROS topic used by ArduPilot for obstacle avoidance.
+
+```bash
+rosrun your_package lidar_to_mavlink_bridge.py
+```
+
+Make sure `lidar_to_mavlink_bridge.py` exists and is executable in your ROS package.
+
+---
+
+### 5. Start Semantic Segmentation Vision Control
+
+This runs the vision-based sidewalk following using Jetson and a camera.
+
+#### If using Jetson IMX219 CSI Camera:
+
+```bash
+python3 mavsegmav.py --input-flip=rotate-180 --rc=9 --vel=2.5 --device=/dev/ttyTHS1 --baud=57600 csi://0
+```
+
+#### If using RealSense D435 USB Camera:
+
+```bash
+python3 mavsegmav.py --input-flip=none --rc=9 --vel=2.5 --device=/dev/ttyTHS1 --baud=57600 /dev/video0
+```
+
+- The robot will **only follow vision** if RC9 switch is set HIGH.
+- Otherwise, it defaults to GPS + LiDAR navigation.
+
+---
+
+## 🧠 Optional Autostart with systemd
+
+You can make semantic vision autostart on boot:
+
+```bash
+sudo systemctl enable segmav
+```
+
+This assumes you created a `segmav.service` unit in `/etc/systemd/system/`.
+
+---
+
+## 📦 Optional: RealSense Camera Node
+
+If other ROS tools (like RViz or bag recording) need access to the RealSense:
+
+```bash
+roslaunch realsense2_camera rs_camera.launch
+```
+
+---
+
+## 🛰️ Optional: RViz for Debug
+
+To view what the robot is seeing in real-time:
+
+```bash
+rviz
+```
+
+Add these displays:
+
+- `/scan` (LiDAR scan)
+- `/camera/image_raw` (camera feed)
+- `/mavros/local_position/pose`, `/mavros/distance_sensor/custom`, etc. for MAVLink info
+
+---
+
 ---
 
 ## 🧪 Testing Checklist
