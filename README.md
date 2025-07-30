@@ -42,7 +42,9 @@ Use a logic level converter between 3.3V (Jetson) and 5V (Pixhawk):
 ---
 
 ## 🧠 Semantic Segmentation Installation
-
+---
+from: Source code is available from https://github.com/stephendade/segmav
+Video: https://www.youtube.com/watch?v=aOMq3tztdVY
 ```bash
 sudo apt-get update
 sudo apt-get install python3-pip python3-opencv
