@@ -86,4 +86,39 @@ Watch this demo of QuickTune in action:
 ## 💬 Questions?
 
 Visit [https://ardupilot.org/rover/](https://ardupilot.org/rover/) for full Rover documentation.
+---
+You can download rover-quicktune.lua from the official ArduPilot repository here:
+---
+# 🧭 ArduPilot Rover QuickTune Setup Guide
 
+This guide shows how to use the **Rover QuickTune Lua script** to automatically tune your Ackermann rover’s steering and throttle PID gains using ArduPilot scripting.
+
+---
+
+## 📁 Location of Rover QuickTune Script
+
+The official `rover-quicktune.lua` script is part of the ArduPilot firmware source.
+
+You can find it here on GitHub:
+
+👉 **[Rover QuickTune Lua Script – GitHub](https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_Scripting/applets/rover-quicktune.lua)**
+
+Path in the repo:  
+`libraries/AP_Scripting/applets/rover-quicktune.lua`
+
+---
+## 📚 Official Documentation
+
+Learn more about Lua scripting and QuickTune in the official ArduPilot docs:
+
+🔗 **[ArduPilot QuickTune Docs](https://ardupilot.org/rover/docs/quiktune.html)**
+
+🔗 **[ArduPilot Scripting Applets](https://github.com/ArduPilot/ardupilot_wiki/blob/master/common/source/docs/common-scripting-applets.rst)**
+
+---
+## ✅ Summary
+
+- 📜 Download `rover-quicktune.lua` to your FC SD card under `APM/scripts/`
+- 🛰️ Enable scripting and QuickTune in Mission Planner
+- 🎮 Use an RC switch to trigger tuning
+- 📈 Automatically calibrates feed-forward and PID values for steering and throttle
