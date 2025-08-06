@@ -1,0 +1,13 @@
+[Unit]
+Description=SEGMAV Semantic Navigation Service
+After=network.target
+
+[Service]
+Environment="LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1"
+WorkingDirectory=/home/robot/segmav-main
+ExecStart=/usr/bin/python3 /home/robot/segmav-main/mavsegmav.py --input csi://0 --output file://navout.mp4 --headless
+Restart=on-failure
+User=robot
+
+[Install]
+WantedBy=multi-user.target
