@@ -187,7 +187,10 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl enable segmav
+sudo cp segmav.service /etc/systemd/system/
+sudo systemctl daemon-reexec
+sudo systemctl enable segmav.service
+sudo systemctl start segmav.service
 ```
 
 # ✅ Sidewalk-Following Robot — Launch Instructions (Jetson + Pixhawk + Camera + LiDAR)
