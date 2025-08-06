@@ -48,7 +48,24 @@ Watch this demo of QuickTune in action:
 5. In Mission Planner:
    - Set `RC9_OPTION = 300` (or any unused RC channel)
 6. Ensure vehicle can drive in a smooth circle in **CIRCLE mode**.
+7. Ensure Parameters Are Set
+In Mission Planner, go to Config/Tuning → Full Parameter List and check or set the following:
 
+Parameter	Value	Description
+MODE	17	CIRCLE mode index in ArduPilot
+CIRCLE_RADIUS	10	Radius of the circle in meters
+CIRCLE_RATE	20	Speed of turning in degrees per second
+
+💡 Tip: Smaller CIRCLE_RADIUS means tighter turns. Adjust for your vehicle’s turning capability.
+
+8. Use MAVLink Command (via Mission Planner)
+Go to Flight Data → Actions tab, and in the Do Action dropdown:
+
+Choose: Set Mode
+
+Mode number: 17 (for CIRCLE)
+
+Click DO ACTION
 ---
 
 ## ▶️ Running QuickTune
