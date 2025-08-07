@@ -50,11 +50,23 @@ Here’s what your Jetson Nano home directory should look like when done:
 │   ├── screenshot.png
 │   └── README.md
 │
-└── /catkin_ws/src/
-    └── ldlidar_stl_ros/
-         ├── launch/
-         │   └── ld19.launch     ← Use/edit this file
-         └── src/
+└── catkin_ws/
+    └── src/
+        ├── segmav_bridge/
+        │   ├── CMakeLists.txt
+        │   ├── package.xml
+        │   ├── launch/
+        │   │   └── segmav_bridge.launch          # Starts lidar_to_mavlink_bridge.py
+        │   └── scripts/
+        │       └── lidar_to_mavlink_bridge.py    # ROS node that converts LiDAR to MAVROS message
+        │
+        └── ldlidar_stl_ros/
+            ├── CMakeLists.txt
+            ├── package.xml
+            ├── launch/
+            │   └── ld19.launch                   # Launch file for LD LiDAR (can rename to d500.launch if needed)
+            └── src/
+                └── ...                           # LiDAR driver source files
 ```
 ---
 ## 🔧 Step-by-Step Setup
@@ -138,15 +150,21 @@ Open a terminal on your Jetson Nano or computer running ROS Noetic.
 ### 2. Create a new ROS workspace and download the driver
 
 ```bash
-mkdir -p ~/ldlidar_ros_ws/src
-cd ~/ldlidar_ros_ws/src
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws/src
+rosdep install --from-paths src --ignore-src -r -y
+
+Save lidar_to_mavlink_bridge.py here
+
+chmod +x src/segmav_bridge/scripts/lidar_to_mavlink_bridge.py
+
 git clone https://github.com/ldrobotSensorTeam/ldlidar_stl_ros.git
 ```
 
 ### 3. Install missing dependencies
 
 ```bash
-cd ~/ldlidar_ros_ws
+cd ~/catkin_ws
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
