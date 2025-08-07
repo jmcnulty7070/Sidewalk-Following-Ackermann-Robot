@@ -22,7 +22,11 @@ Works on: Jetson Nano/Orin, Pixhawk or CrossFlight, ROS Noetic, ArduPilot Rover
 ✅ MAVROS  
 ✅ ArduPilot firmware (Rover)
 
-'''
+---
+## 📁 FINAL FOLDER STRUCTURE (Jetson)
+
+Here’s what your Jetson Nano home directory should look like when done:
+```
 ~/                 ← Your Jetson Nano home
 ├── jetson-inference/
 │   ├── build/
@@ -49,7 +53,8 @@ Works on: Jetson Nano/Orin, Pixhawk or CrossFlight, ROS Noetic, ArduPilot Rover
 └── catkin_ws/           ← You’ll create this later for ROS
     ├── src/
     └── build/
-'''
+```
+---
 ## 🔧 Step-by-Step Setup
 
 ### 1. Flash Jetson with JetPack
