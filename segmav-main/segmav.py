@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Combined script for MAVLink UDP control + semantic segmentation steering
+SEGMAV: Jetson-based semantic segmentation navigation and recording system.
+This script includes SegThread (for navigation) and VideoThread (for recording).
 """
 
 import sys
@@ -22,23 +23,20 @@ from jetson_utils import (
 
 from pymavlink import mavutil
 
-# ------------------------ GLOBALS ------------------------
+# ========== Shared Flags ==========
 exit_event = threading.Event()
-
 
 def signal_handler(signum, frame):
     exit_event.set()
 
 
-# ------------------------ MAVLINK UTILS ------------------------
+# ========== MAVLink Utilities ==========
 def send_msg_to_gcs(conn, text):
     msg = "SEGMAV: " + text
     conn.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_INFO, msg.encode())
 
-
 def play_tune(conn, tune):
     conn.mav.play_tune_send(conn.target_system, conn.target_component, bytes(tune, "ascii"))
-
 
 def set_target(conn, speed, yaw):
     POSITION_TARGET_TYPEMASK = 0b101111000111
@@ -49,14 +47,14 @@ def set_target(conn, speed, yaw):
     )
 
 
-# ------------------------ THREADS ------------------------
+# ========== SegThread ==========
 class SegThread(threading.Thread):
     def __init__(self, args, aargv, is_headless):
-        threading.Thread.__init__(self)
+        super().__init__()
         self.should_exit = False
         self.args = args
         self.input = videoSource(args.input, argv=aargv)
-        self.output = videoOutput(args.output, argv=aargv)
+        self.output = videoOutput(args.output, argv=aargv) if not is_headless else None
         self.net = segNet(args.network)
         self.net.SetOverlayAlpha(args.alpha)
         self.overlay = None
@@ -85,15 +83,16 @@ class SegThread(threading.Thread):
                 if len(self.timeOfCapture) > self.numAveraging:
                     self.timeOfCapture = self.timeOfCapture[-self.numAveraging:]
 
-            if not self.overlay:
+            if self.overlay is None:
                 self.overlay = cudaAllocMapped(width=img_input.shape[1],
                                                height=img_input.shape[0],
                                                format=img_input.format)
 
-            if not self.class_mask:
+            if self.class_mask is None:
                 self.grid_width, self.grid_height = self.net.GetGridSize()
-                self.class_mask = cudaAllocMapped(
-                    width=self.grid_width, height=self.grid_height, format="gray8")
+                self.class_mask = cudaAllocMapped(width=self.grid_width,
+                                                  height=self.grid_height,
+                                                  format="gray8")
                 self.class_mask_np = cudaToNumpy(self.class_mask)
 
             self.net.Process(img_input, ignore_class=self.args.ignore_class)
@@ -101,6 +100,7 @@ class SegThread(threading.Thread):
             cudaDeviceSynchronize()
             self.net.Mask(self.class_mask, self.grid_width, self.grid_height)
 
+            # Segmentation post-processing
             mask = cv2.inRange(self.class_mask_np, self.args.targetclass, self.args.targetclass)
             zoom = 400
             width = int(mask.shape[1] * zoom / 100)
@@ -109,7 +109,8 @@ class SegThread(threading.Thread):
 
             contours, _ = cv2.findContours(maskzoom, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             if len(contours) == 0:
-                self.output.Render(self.overlay)
+                if self.output:
+                    self.output.Render(self.overlay)
                 continue
 
             c = max(contours, key=cv2.contourArea)
@@ -146,7 +147,8 @@ class SegThread(threading.Thread):
                               int(centroids[1][1] * img_input.shape[0] / height)],
                              (255, 255, 255), 4)
 
-            self.output.Render(self.overlay)
+            if self.output:
+                self.output.Render(self.overlay)
 
     def getBearing(self):
         with self.threadLock:
@@ -155,7 +157,27 @@ class SegThread(threading.Thread):
             return -0.7 * np.mean(self.bearings)
 
 
-# ------------------------ MAIN ------------------------
+# ========== VideoThread ==========
+class VideoThread(threading.Thread):
+    def __init__(self, args, aargv, filename="video.mp4"):
+        super().__init__()
+        self.should_exit = False
+        self.args = args
+        self.input = videoSource(args.input, argv=aargv)
+        self.output = videoOutput(filename, argv=aargv)
+
+    def exit(self):
+        self.should_exit = True
+
+    def run(self):
+        while not self.should_exit:
+            frame = self.input.Capture()
+            if frame is None:
+                continue
+            self.output.Render(frame)
+
+
+# ========== Main Launch ==========
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, default="csi://0")
@@ -195,34 +217,37 @@ if __name__ == "__main__":
             break
 
     print(f"Connected to system {conn.target_system}")
-
     send_msg_to_gcs(conn, "SegMAV script started")
     play_tune(conn, "L12DD")
 
     curHeading = -1
     rc_level = None
-    fieldname = "chan" + str(args.rc) + "_raw"
+    fieldname = f"chan{args.rc}_raw"
     segThread = None
     last_bearing_check = 0
 
     while not exit_event.is_set():
-        msg = conn.recv_match(type='RC_CHANNELS', blocking=True, timeout=0.1)
+        msg = conn.recv_match(blocking=True, timeout=0.1)
         if not msg:
             continue
 
-        value = getattr(msg, fieldname)
-        if rc_level is None or abs(rc_level - value) > 100:
-            if abs(value - args.pwmlow) < 50:
-                if segThread:
-                    segThread.exit()
-                    segThread = None
+        if msg.get_type() == 'VFR_HUD':
+            curHeading = msg.heading
+
+        if msg.get_type() == 'RC_CHANNELS':
+            value = getattr(msg, fieldname)
+            if rc_level is None or abs(rc_level - value) > 100:
+                if abs(value - args.pwmlow) < 50:
+                    if segThread:
+                        segThread.exit()
+                        segThread = None
+                        play_tune(conn, "L12DD")
+                elif abs(value - args.pwmhigh) < 50 and not segThread:
+                    segThread = SegThread(args, sys.argv, is_headless)
+                    segThread.start()
+                    conn.set_mode("GUIDED")
                     play_tune(conn, "L12DD")
-            elif abs(value - args.pwmhigh) < 50 and not segThread:
-                segThread = SegThread(args, sys.argv, is_headless)
-                segThread.start()
-                conn.set_mode("GUIDED")
-                play_tune(conn, "L12DD")
-            rc_level = value
+                rc_level = value
 
         if segThread and time.time() - last_bearing_check > 0.3:
             bearing = segThread.getBearing()
