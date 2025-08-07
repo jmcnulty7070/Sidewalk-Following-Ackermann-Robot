@@ -50,9 +50,11 @@ Here’s what your Jetson Nano home directory should look like when done:
 │   ├── screenshot.png
 │   └── README.md
 │
-└── catkin_ws/           ← You’ll create this later for ROS
-    ├── src/
-    └── build/
+└── /catkin_ws/src/
+    └── ldlidar_stl_ros/
+         ├── launch/
+         │   └── ld19.launch     ← Use/edit this file
+         └── src/
 ```
 ---
 ## 🔧 Step-by-Step Setup
@@ -105,6 +107,98 @@ chmod +x *.py
 | `lidar_to_mavlink_bridge.py` | Sends LiDAR data to ArduPilot |
 | `segmav.service` | Lets you auto-start the robot script at boot |
 | `segmav_bridge.launch` | ROS launch file to run the LiDAR bridge |
+
+---
+# LDROBOT D500 LiDAR (STL‑19P/D500) ROS1 Integration
+
+This guide explains how to set up the **LDROBOT D500 (STL‑19P/D500) LiDAR Kit** using the official ROS 1 driver. This sensor works great for projects like **obstacle avoidance**, **SLAM**, and **Bendy Ruler navigation** on **ROS Noetic**.
+
+---
+
+## ✅ Supported ROS Driver
+
+Use the official **`ldlidar_stl_ros`** package from LDROBOT.
+
+**Supports:**
+- Models: LD06, LD19 (D500 is compatible)
+- ROS1 and ROS2
+- Publishes to `/scan` topic
+- Includes launch files and serial communication
+
+GitHub Repository: [ldlidar_stl_ros](https://github.com/ldrobotSensorTeam/ldlidar_stl_ros)
+
+---
+
+## 🛠️ Install Instructions (8th Grade Level)
+
+### 1. Open a Terminal
+
+Open a terminal on your Jetson Nano or computer running ROS Noetic.
+
+### 2. Create a new ROS workspace and download the driver
+
+```bash
+mkdir -p ~/ldlidar_ros_ws/src
+cd ~/ldlidar_ros_ws/src
+git clone https://github.com/ldrobotSensorTeam/ldlidar_stl_ros.git
+```
+
+### 3. Install missing dependencies
+
+```bash
+cd ~/ldlidar_ros_ws
+rosdep install --from-paths src --ignore-src -r -y
+```
+
+### 4. Give USB permission to LiDAR port
+
+Substitute the actual port if not `/dev/ttyUSB0`:
+
+```bash
+sudo chmod 777 /dev/ttyUSB0
+```
+
+### 5. Build the workspace
+
+```bash
+catkin_make
+source devel/setup.bash
+```
+
+### 6. Launch the driver
+
+Use the existing launch file for LD19 (D500 works the same):
+
+```bash
+roslaunch ldlidar_stl_ros ld19.launch
+```
+
+> ✅ If there’s a `d500.launch`, you can use that instead.
+
+### 7. Confirm LiDAR is working
+
+```bash
+rostopic echo /scan
+```
+
+You should see live distance readings appear in your terminal.
+
+---
+
+## 💡 Why This Driver Works for D500
+
+- ✅ Official support for LD series (LD19 ≈ D500)
+- ✅ ROS1-compatible
+- ✅ `/scan` topic is standard for obstacle avoidance or MAVROS integration
+- ✅ No need for custom code
+
+---
+
+## 🧩 Integrates With:
+
+- `lidar_to_mavlink_bridge.py`
+- `bendy_ruler` obstacle avoidance
+- Jetson Nano + MAVROS
 
 ---
 
