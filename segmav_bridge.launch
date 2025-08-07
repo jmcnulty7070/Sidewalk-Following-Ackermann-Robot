@@ -1,0 +1,9 @@
+<launch>
+    <node name="lidar_to_mavlink_bridge"
+          pkg="segmav_bridge"
+          type="lidar_to_mavlink_bridge.py"
+          output="screen"
+          required="true"
+          respawn="true">
+    </node>
+</launch>
