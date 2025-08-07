@@ -23,7 +23,33 @@ Works on: Jetson Nano/Orin, Pixhawk or CrossFlight, ROS Noetic, ArduPilot Rover
 ✅ ArduPilot firmware (Rover)
 
 ---
-
+~/                 ← Your Jetson Nano home
+├── jetson-inference/
+│   ├── build/
+│   │   ├── aarch64/bin/
+│   │   │   └── segnet.py  ← segmentation executable
+│   │   ├── CMakeFiles/
+│   ├── data/
+│   │   └── networks/
+│   │       └── fcn-resnet18-cityscapes-1024x512/
+│   │           ├── labels.txt
+│   │           ├── fcn_resnet18.onnx
+│   │           └── other model files
+│   └── python/
+│       └── jetson_inference/
+│       └── jetson_utils/
+│
+├── segmav/
+│   ├── mavsegmav.py
+│   ├── segmav.py
+│   ├── segmav.service
+│   ├── screenshot.png
+│   └── README.md
+│
+└── catkin_ws/           ← You’ll create this later for ROS
+    ├── src/
+    └── build/
+---
 ## 🔧 Step-by-Step Setup
 
 ### 1. Flash Jetson with JetPack
