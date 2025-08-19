@@ -1,0 +1,159 @@
+pkill -f "mavros|mavlink-router|mavsegmav|ldlidar"
+ps -aux | egrep "mavros|mavlink-router|mavsegmav|ldlidar"
+sudo systemctl stop ldlidar.service
+sudo systemctl disable ldlidar.service
+sudo systemctl stop mavros.service
+sudo systemctl disable mavros.service
+sudo systemctl stop mavlink-router.service
+sudo systemctl disable mavlink-router.service
+sudo systemctl stop segmav.service
+sudo systemctl disable segmav.service
+list any remaining:
+systemctl list-unit-files | grep enabled
+
+Here’s your one-page Sidewalk GPS Robot – Manual Ops Cheat Sheet. Feel free to print/tape to the robot.
+
+
+1) Start MAVLink Router (FC → UDP 14550/14551)
+sudo systemctl restart mavlink-router
+sudo systemctl status mavlink-router --no-pager
+sudo ss -ulpn | egrep '14550|14551|mavlink-routerd'   # should show mavlink-routerd
+
+
+Ports
+
+14550 → Mission Planner
+
+14551 → SegMAV (+ MAVROS binds/reads)
+
+2) Start MAVROS (binds UDP 14551)
+roslaunch mavros apm.launch fcu_url:=udp://0.0.0.0:14551@
+
+
+Quick checks
+
+rostopic echo -n1 /mavros/state
+rostopic echo -n1 /mavros/global_position/raw/fix
+
+3) Start LiDAR (optional: RViz & MP Proximity)
+rosrun ldlidar_stl_ros ldlidar_stl_ros_node \
+  _product_name:=LDLiDAR_LD19 \
+  _port_name:=/dev/ldlidar \
+  _port_baudrate:=230400 \
+  _frame_id:=laser \
+  _topic_name:=/scan
+
+
+Verify
+
+rostopic hz /scan             # should tick ~5–10 Hz+
+
+
+Relay to Mission Planner Proximity (optional)
+
+rosrun topic_tools relay /scan /mavros/obstacle/send
+
+4) Start SegMAV sidewalk follower (centering “nudge”)
+cd ~/segmav
+python3 mavsegmav_merged.py \
+  --device=udpin:127.0.0.1:14551 \
+  --input=v4l2:///dev/Astra_rgb \
+  --preview
+
+
+Remove --preview for headless.
+
+5) (Optional) Tiny GUIDED Waypoint Streamer
+
+Reads MP waypoints, streams next target while SegMAV keeps you centered.
+
+cd ~/segmav
+python3 guided_mission.py --device=udpin:127.0.0.1:14551
+
+6) Mission Flow (recommended)
+
+Power robot, ensure GNSS has fix (Mission Planner shows sats).
+
+ARM & GUIDED in Mission Planner.
+
+If using path points: upload waypoints in MP (or run guided_mission.py).
+
+SegMAV window shows overlay (if --preview).
+
+Drive: in GUIDED, click-to-point (or let the tiny script stream next point).
+
+To stop: Disarm or switch HOLD/LOITER.
+
+7) Quick Troubleshooting
+
+Router won’t start
+
+sudo journalctl -u mavlink-router -n 100 --no-pager
+
+
+Check /etc/mavlink-router/main.conf for valid mode=Normal & endpoints.
+
+Port busy / bind error
+
+sudo ss -ulpn | egrep '14550|14551|mavlink-routerd|mavros'
+
+
+Stop duplicates, then restart.
+
+No LiDAR in RViz/MP
+
+Confirm device: ls -l /dev/ldlidar
+
+Check topic: rostopic hz /scan
+
+Relay running? rosnode list | grep topic_tools
+
+SegMAV no video
+
+Confirm camera node: ls -l /dev/Astra_rgb
+
+Try plain view: python3 mavsegmav_merged.py --input=v4l2:///dev/Astra_rgb --preview
+
+No FCU link in MAVROS
+
+MAVROS log should say Got HEARTBEAT, connected.
+
+If not: verify router, IP/port, and that only one binds 14551.
+
+8) Safety & Mode Tips
+
+GUIDED = segmentation “nudge” + streamed targets (click-to-go or tiny script).
+
+AUTO runs mission autonomously; default ArduRover won’t use SegMAV centering.
+
+For tight turns (Ackermann), place waypoints to allow a large turn radius; SegMAV will re-center back on sidewalk after the maneuver in GUIDED.
+
+
+
+Since you’re running an Ackermann car and need a larger turning radius (≈2 m) at waypoints, the parameter you’ll adjust is in ArduPilot’s navigation tuning, not in your guided_mission.py script.
+
+1. Key Parameter: WP_RADIUS
+
+What it does: Defines the radius (in meters) around a waypoint where the vehicle considers the waypoint “reached” and begins turning toward the next one.
+
+Default: Often 2 m for rovers, but you may need to increase it (e.g., 3–4 m) to prevent sharp turns.
+
+Why: If it’s too small, the rover will try to “hit” the waypoint exactly, forcing a pivot. By increasing it, the car arcs through waypoints more naturally.
+
+2. Supporting Parameters for Ackermann Car
+
+TURN_MAX_G (or ATC_STR_RAT_MAX in some builds): Limits max steering rate, useful for smoothing turns.
+
+NAVL1_PERIOD: Adjusts lookahead distance for the L1 controller. Increasing it makes turns wider and smoother.
+
+WP_OVERSHOOT: Lets rover overshoot a little past waypoint before turning, also smoothing the radius.
+
+3. How to Apply for Your Case
+
+Set WP_RADIUS = 2.0 m (or bigger) for your driveway/sidewalk.
+
+If it still jerks at turns, increase NAVL1_PERIOD (e.g., from 15 → 20).
+
+If it cuts turns too sharp, try adding WP_OVERSHOOT (0.5–1.0 m).
+
+✅ In short: Update WP_RADIUS to ~2 m (or more depending on testing). Then fine-tune with NAVL1_PERIOD for smooth Ackermann steering.
