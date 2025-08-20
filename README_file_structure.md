@@ -34,9 +34,9 @@ for easy navigation.
     │   ├── mavlink-router.service    # Starts MAVLink Router automatically
     │   └── rviz.service              # Optional RViz visualization
     ├── udev/                         # Persistent device naming rules
-    │   ├── 99-astra.rules            # Jetson camera (/dev/astra)
+    │   ├── 99-astra.rules            # Jetson camera (/dev/astra_rgb)
     │   ├── 99-ldlidar.rules          # LiDAR (/dev/ldlidar)
-    │   ├── 99-telem1.rules           # FTDI cable for Pixhawk (MAVLink)
+    │   ├── 99-telem1.rules           # FTDI cable for Pixhawk (/dev/telem1 for MAVLink)
     │  
     ├── docs/                         # Documentation & diagrams
     │   ├── system_overview.png       # High-level block diagram
