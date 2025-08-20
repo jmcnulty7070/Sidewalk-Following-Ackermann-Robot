@@ -38,7 +38,7 @@ for easy navigation.
     │   ├── 99-astra.rules            # Jetson camera (/dev/astra)
     │   ├── 99-ldlidar.rules          # LiDAR (/dev/ldlidar)
     │   ├── 99-telem1.rules           # FTDI cable for Pixhawk (MAVLink)
-    │   └── 99-imu.rules              # Witmotion IMU
+    │  
     ├── docs/                         # Documentation & diagrams
     │   ├── system_overview.png       # High-level block diagram
     │   ├── communication_flow.png    # Network/UDP/ROS/MAVLink layout
