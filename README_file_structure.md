@@ -15,14 +15,13 @@ for easy navigation.
     ├── README_communication_plan.md  # Communication flow (MAVLink, ROS, Jetson, radios)
     ├── README_file_structure.md      # This document
     ├── segmav/                       # Segmentation + MAVLink control logic
-    │   ├── mavsegmav.py              # Main GPS + MAVLink controller (simple)
+    │   ├── guided_mission.py         # GPS follower 
     │   ├── mavsegmav_merged.py       # Advanced merged script (GPS + Segmentation + LiDAR)
     │   ├── segmav.py                 # Segmentation logic (SegThread, VideoThread)
     │   ├── __init__.py
     │   └── utils/                    # Helper functions
     │       └── vision_helpers.py
     ├── launch/                       # ROS and non-ROS launch/config files
-    │   ├── mapping.launch            # Cartographer or SLAM launch
     │   ├── sensors.launch.xml        # LiDAR, IMU, and Camera nodes
     │   └── mavros.launch             # MAVROS bridge to Pixhawk/CrossFlight
     ├── config/                       # Parameter configs
