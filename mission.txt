@@ -1,0 +1,250 @@
+mission to run in GUIDED so SegMAV’s velocity nudges can blend in. Here’s a drop-in GUIDED multi-waypoint runner that sets GUIDED, sends each target with MAV_CMD_DO_REPOSITION, waits until you’re within an acceptance radius, then advances to the next waypoint. This plays nicely with SegMAV publishing velocity-only nudges.
+
+Router (owns /dev/telem1 @ 115200):
+
+sudo systemctl restart mavlink-router
+journalctl -u mavlink-router -b --no-pager | tail -n 20
+sudo lsof /dev/telem1      # expect: mavlink-routerd holds it
+
+ROS master:
+
+env -i bash --noprofile --norc
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311; export ROS_IP=127.0.0.1
+roscore
+
+
+MAVROS (listener on 14551):
+
+env -i bash --noprofile --norc
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311; export ROS_IP=127.0.0.1
+roslaunch mavros apm.launch fcu_url:=udp://:14551@
+
+	# check: rostopic echo -n1 /mavros/state    (should show connected: True)
+
+LiDAR (workspace shell; uses /dev/ldlidar):
+
+bash
+source /opt/ros/noetic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311; export ROS_IP=127.0.0.1
+rosrun ldlidar_stl_ros ldlidar_stl_ros_node _product_name:=LDLiDAR_LD19 _port_name:=/dev/ldlidar _frame_id:=laser _port_baudrate:=230400
+
+
+PRX feed (clean apt shell):
+
+env -i bash --noprofile --norc
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311; export ROS_IP=127.0.0.1
+python3 ~/segmav/scan_to_distance_sensor_mavlink.py
+
+Terminal 4 — SegMAV (your repo)
+cd ~/segmav
+python3 mavsegmav_merged.py --device=udpin:0.0.0.0:14555 --preview
+
+Terminal 5 — GPS Waypoint uploader (clean apt env)
+
+Create (once) the CSV and uploader script (below).
+
+tee ~/segmav/waypoints.csv >/dev/null <<'CSV'
+# lat,lon,alt_m,hold_s,accept_m,yaw_deg
+47.3977419, 8.5455938, 0, 0, 1.0, 0
+47.3979000, 8.5458000, 0, 0, 1.0, 0
+47.3980500, 8.5456000, 0, 0, 1.0, 0
+CSV
+
+Altitude is ignored for Rover but required by MAVLink (use 0).
+
+hold_s = loiter time at waypoint (seconds).
+
+accept_m = acceptance radius (meters).
+
+yaw_deg is optional—set to 0 or leave empty.
+
+
+Run it whenever you want to load/replace a mission.
+
+# clean apt env
+env -i bash --noprofile --norc
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311
+export ROS_IP=127.0.0.1
+
+
+want the mission to run in GUIDED so SegMAV’s velocity nudges can blend in. Here’s a drop-in GUIDED multi-waypoint runner that sets GUIDED, sends each target with MAV_CMD_DO_REPOSITION, waits until you’re within an acceptance radius, then advances to the next waypoint. This plays nicely with SegMAV publishing velocity-only nudges.
+
+1) Save the GUIDED runner
+tee ~/segmav/guided_waypoint_runner.py >/dev/null <<'PY'
+#!/usr/bin/env python3
+import csv, math, time, argparse
+import rospy
+from sensor_msgs.msg import NavSatFix
+from mavros_msgs.msg import State
+from mavros_msgs.srv import CommandBool, SetMode, CommandLong
+
+EARTH_R = 6371000.0  # meters
+
+def haversine_m(lat1, lon1, lat2, lon2):
+    dlat = math.radians(lat2-lat1)
+    dlon = math.radians(lon2-lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlon/2)**2
+    return 2*EARTH_R*math.asin(math.sqrt(a))
+
+def read_csv(path):
+    pts=[]
+    with open(path,'r') as f:
+        for row in csv.reader(f):
+            if not row or row[0].strip().startswith('#'): continue
+            lat=float(row[0]); lon=float(row[1]); alt=float(row[2]) if len(row)>2 and row[2] else 0.0
+            hold=float(row[3]) if len(row)>3 and row[3] else 0.0
+            accept=float(row[4]) if len(row)>4 and row[4] else 1.5
+            yaw=float(row[5]) if len(row)>5 and row[5] else float('nan')
+            pts.append((lat,lon,alt,hold,accept,yaw))
+    if not pts: raise RuntimeError("No waypoints in CSV")
+    return pts
+
+class GuidedRunner:
+    def __init__(self, csv_file, arm_after, ground_speed):
+        self.points = read_csv(csv_file)
+        self.arm_after = arm_after
+        self.gs = ground_speed
+
+        self.state = State()
+        self.fix   = NavSatFix()
+
+        rospy.init_node("guided_waypoint_runner", anonymous=True)
+        rospy.Subscriber("/mavros/state", State, self._state_cb, queue_size=1)
+        rospy.Subscriber("/mavros/global_position/global", NavSatFix, self._fix_cb, queue_size=1)
+
+        rospy.wait_for_service("/mavros/cmd/arming")
+        rospy.wait_for_service("/mavros/set_mode")
+        rospy.wait_for_service("/mavros/cmd/command")
+
+        self.srv_arm   = rospy.ServiceProxy("/mavros/cmd/arming", CommandBool)
+        self.srv_mode  = rospy.ServiceProxy("/mavros/set_mode", SetMode)
+        self.srv_clong = rospy.ServiceProxy("/mavros/cmd/command", CommandLong)
+
+    def _state_cb(self, msg): self.state = msg
+    def _fix_cb(self,   msg): self.fix   = msg
+
+    def wait_connected(self, tmo=20):
+        t0=time.time()
+        rospy.loginfo("Waiting for MAVROS->FCU connection...")
+        rate=rospy.Rate(5)
+        while not rospy.is_shutdown():
+            if self.state.connected: return
+            if time.time()-t0>tmo: raise RuntimeError("No FCU connection via MAVROS")
+            rate.sleep()
+
+    def set_guided(self):
+        rospy.loginfo("Switching to GUIDED...")
+        ok = self.srv_mode(base_mode=0, custom_mode="GUIDED").mode_sent
+        if not ok:
+            raise RuntimeError("Set mode GUIDED failed")
+        rospy.loginfo("GUIDED set.")
+
+    def maybe_arm(self):
+        if not self.arm_after: return
+        rospy.loginfo("Arming...")
+        if not self.srv_arm(True).success:
+            rospy.logwarn("Arming failed (continuing)")
+
+    def do_reposition(self, lat, lon, alt=0.0, yaw_deg=float('nan'), accept_m=1.5, speed_mps=None):
+        """
+        Send MAV_CMD_DO_REPOSITION (192).
+        params:
+          1: ground speed (m/s) or 0 to leave unchanged
+          2: bitmask (not used here)
+          3: yaw (deg) or NaN
+          4: empty
+          5: lat (deg)
+          6: lon (deg)
+          7: alt (m, AGL/AMSL per firmware; Rover ignores alt)
+        """
+        gs = 0.0 if (speed_mps is None or speed_mps <= 0) else speed_mps
+        yaw = 0.0 if math.isnan(yaw_deg) else float(yaw_deg)
+        req = self.srv_clong(
+            broadcast=False,
+            command=192,             # MAV_CMD_DO_REPOSITION
+            confirmation=0,
+            param1=gs,
+            param2=0.0,              # options bitmask (unused for Rover)
+            param3=yaw,
+            param4=0.0,
+            param5=lat,
+            param6=lon,
+            param7=alt
+        )
+        if not req.success:
+            raise RuntimeError("DO_REPOSITION failed")
+        rospy.loginfo("GUIDED target set: lat=%.7f lon=%.7f acc=%.2fm", lat, lon, accept_m)
+
+    def run(self):
+        self.wait_connected()
+        self.set_guided()
+        self.maybe_arm()
+
+        rate=rospy.Rate(5)
+        for i,(lat,lon,alt,hold,accept,yaw) in enumerate(self.points):
+            self.do_reposition(lat,lon,alt,yaw,accept,self.gs)
+            # Wait until within acceptance radius
+            while not rospy.is_shutdown():
+                if self.fix.status.status != 0:
+                    d = haversine_m(self.fix.latitude, self.fix.longitude, lat, lon)
+                    rospy.loginfo_throttle(2.0, "WP %d: dist=%.2f m (accept=%.2f)", i, d, accept)
+                    if d <= accept:
+                        rospy.loginfo("WP %d reached (%.2f m). Hold %.1fs", i, d, hold)
+                        break
+                rate.sleep()
+            # Optional hold
+            t_end = time.time()+hold
+            while not rospy.is_shutdown() and time.time() < t_end:
+                rate.sleep()
+
+        rospy.loginfo("Mission complete in GUIDED.")
+
+if __name__=="__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--file", required=True, help="CSV with lat,lon,alt,hold_s,accept_m,yaw_deg")
+    ap.add_argument("--arm", action="store_true", help="Arm the rover")
+    ap.add_argument("--speed", type=float, default=0.0, help="Desired ground speed m/s (0=leave unchanged)")
+    args = ap.parse_args()
+    GuidedRunner(args.file, args.arm, args.speed).run()
+PY
+chmod +x ~/segmav/guided_waypoint_runner.py
+
+
+What it does
+
+Switches to GUIDED (not AUTO).
+
+Optionally arms (--arm).
+
+For each CSV point: sends DO_REPOSITION with optional ground speed and yaw.
+
+Monitors GPS distance to the target; moves on once within accept_m meters; honors per-WP hold time.
+
+Lets SegMAV keep publishing velocity-only nudges (those won’t conflict with DO_REPOSITION targets).
+
+2) Example CSV (same format as before)
+tee ~/segmav/waypoints.csv >/dev/null <<'CSV'
+# lat,lon,alt_m,hold_s,accept_m,yaw_deg
+47.3977419, 8.5455938, 0, 0, 1.5, 0
+47.3979000, 8.5458000, 0, 0, 1.5, 0
+47.3980500, 8.5456000, 0, 0, 1.5, 0
+CSV
+
+
+env -i bash --noprofile --norc
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://127.0.0.1:11311
+export ROS_IP=127.0.0.1
+
+python3 ~/segmav/guided_waypoint_runner.py --file ~/segmav/waypoints.csv --arm --speed 1.2
+
+
+
+
+Open Mission Planner → Proximity. You should see the arcs now. If not, tell me what you see under MAVLink Inspector → DISTANCE_SENSOR (values/IDs), and I’ll tune the last bit (sector count, max/min, angle offset).
+
