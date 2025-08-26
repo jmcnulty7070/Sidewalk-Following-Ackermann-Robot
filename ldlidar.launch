@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="ldlidar_stl_ros" type="ldlidar_stl_ros_node" name="ldlidar">
+    <param name="port_name" value="/dev/ldlidar"/>
+    <param name="frame_id"  value="laser"/>
+    <!-- other params as you had (baud, sample_rate, etc.) -->
+  </node>
+</launch>

@@ -1,0 +1,18 @@
+# Proximity via MAVLink from companion
+PRX1_TYPE     = 2        # 2 = MAVLink
+
+# Enable OA + choose Bendy Ruler
+AVOID_ENABLE  = 7        # act on all sources
+OA_TYPE       = 1        # 1 = BendyRuler
+
+# Bendy Ruler basics (tune later)
+OA_BR_TYPE    = 0        # standard
+OA_BR_LOOKAH  = 4.0      # lookahead (m) typical 3–6
+OA_BR_MARGIN  = 0.7      # clearance (m)
+OA_DB_EXCL    = 0        # no debug exclusion
+OA_TIMEOUT    = 0.5      # seconds before PRX considered stale
+
+# (Optional) Limit speeds while avoiding
+WPNAV_SPEED   = 1.5      # m/s (example)
+OA_SPD_MASK   = 7        # apply speed limit in all modes
+OA_SPD_LIM    = 1.0      # m/s during avoidance
