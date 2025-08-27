@@ -1,0 +1,18 @@
+[Unit]
+Description=SEGMAV PRX publisher (scan_to_obstacle_distance.py)
+After=network-online.target mavlink-router.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust the user if you prefer running as non-root; ensure permissions to /dev/ldlidar etc.
+User=robot
+Environment=ROS_MASTER_URI=http://localhost:11311
+Environment=ROS_IP=127.0.0.1
+# Wrapper script sources ROS + workspace and launches the node
+ExecStart=/usr/local/bin/segmav-prx.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

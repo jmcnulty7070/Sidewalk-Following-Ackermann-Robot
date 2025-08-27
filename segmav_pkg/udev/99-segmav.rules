@@ -1,0 +1,6 @@
+# FTDI adapter for TELEM1 -> /dev/telem1
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="telem1"
+
+# LD19 LiDAR USB adapter -> /dev/ldlidar
+# Adjust idVendor/idProduct with `lsusb` if yours differs
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="ldlidar"

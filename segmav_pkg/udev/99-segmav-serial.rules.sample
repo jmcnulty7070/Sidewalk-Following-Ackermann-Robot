@@ -1,0 +1,31 @@
+# segmav udev rules (sample)
+# Create stable symlinks:
+#   /dev/telem1  -> your FTDI/USB-UART connected to TELEM1 on the FC
+#   /dev/ldlidar -> your LD19 LiDAR USB serial device
+#
+# Choose ONE matching style per device: VID/PID OR serial number.
+
+# ---------------- FTDI / USB-UART (examples) ----------------
+# FTDI FT232R (VID:PID = 0403:6001)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="telem1", MODE="0666", GROUP="dialout"
+
+# Silicon Labs CP210x (VID:PID = 10c4:ea60)
+#SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="telem1", MODE="0666", GROUP="dialout"
+
+# Match by USB serial number (preferred if available – replace ABC123 with yours)
+#SUBSYSTEM=="tty", ATTRS{serial}=="ABC123", SYMLINK+="telem1", MODE="0666", GROUP="dialout"
+
+# ---------------- LD19 LiDAR (likely CP210x or CH34x) ----------------
+# If your LD19 uses CP210x:
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="ldlidar", MODE="0666", GROUP="dialout"
+
+# If your LD19 appears as CH340/CH341 (VID:PID = 1a86:7523):
+#SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="ldlidar", MODE="0666", GROUP="dialout"
+
+# Match by product string (fallback – replace 'LD LiDAR' with your device's ATTRS{product})
+#SUBSYSTEM=="tty", ATTRS{product}=="LD LiDAR", SYMLINK+="ldlidar", MODE="0666", GROUP="dialout"
+
+# Notes:
+# 1) Find attributes with:   udevadm info -a -n /dev/ttyUSB0 | less
+# 2) After editing rules:    sudo udevadm control --reload-rules && sudo udevadm trigger
+# 3) Re-plug devices and verify: ls -l /dev/telem1 /dev/ldlidar

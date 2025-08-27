@@ -1,0 +1,3 @@
+<launch>
+  <node pkg="segmav" type="scan_to_obstacle_distance.py" name="scan_to_obstacle_distance" output="screen"/>
+</launch>

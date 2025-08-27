@@ -1,0 +1,21 @@
+[General]
+TcpServerPort=5760
+ReportStats=false
+MavlinkDialect=ardupilotmega
+
+[UartEndpoint telem1]
+Device=/dev/telem1
+Baud=921600
+FlowControl=false
+
+[UdpEndpoint gcs]
+Mode=Server
+Port=14550
+
+[UdpEndpoint segmav]
+Mode=Server
+Port=14551
+
+[UdpEndpoint prx]
+Mode=Server
+Port=14552
