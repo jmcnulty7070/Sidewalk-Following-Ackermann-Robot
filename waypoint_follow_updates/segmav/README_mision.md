@@ -115,6 +115,7 @@ source /opt/ros/noetic/setup.bash
 source ~/catkin_ws/devel/setup.bash
 roslaunch ldlidar_stl_ros ld19.launch
 ```
+(Optional) If the Proximity ring is rotated in Mission Planner, try --yaw_offset_deg 90 (or -90, 180).
 
 Check it’s alive:
 ```bash
