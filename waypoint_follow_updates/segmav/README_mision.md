@@ -20,18 +20,18 @@ If it’s still too cautious, lower AVOID_MARGIN a bit (e.g., 0.20–0.25 m).
 
 Worst case for testing: set OA_TYPE=0 to disable avoidance temporarily (but then you rely only on SegMAV + mission runner).UIDED runner** — pulls the mission from the FC and walks waypoints using Rover-friendly commands
 
-'Mission Planner (GCS)
+-Mission Planner (GCS)
         │  (MAVLink mission upload)
         ▼
-mavlink-router :14550  (UDP server for GCS)
+-mavlink-router :14550  (UDP server for GCS)
         │
         ▼
-/dev/telem1  ↔  Flight Controller  (mission is stored here)
+-/dev/telem1  ↔  Flight Controller  (mission is stored here)
         ▲
         │  (MISSION_REQUEST_LIST / MISSION_ITEM[_INT] replies)
         │
-Jetson runner  ↔  mavlink-router :5760 (TCP)
-(guided_waypoint_runner_pymav.py pulls waypoints from the FC)'
+-Jetson runner  ↔  mavlink-router :5760 (TCP)
+-(guided_waypoint_runner_pymav.py pulls waypoints from the FC)
 
 
 What [UdpEndpoint GCS_14550] does
