@@ -99,7 +99,7 @@ source ~/catkin_ws/devel/setup.bash
 
 python3 ~/segmav/scan_to_obstacle_pymav.py \
   --hub udpout:127.0.0.1:14553 \
-  --sectors 72 --min 0.20 --max 12.0 --yaw_offset_deg 0
+  --sectors 72 --min 0.20 --max 0.61 --fov_deg 120 --yaw_offset_deg 0
 ```
 
 > If the Proximity ring looks rotated in Mission Planner, restart with `--yaw_offset_deg 90` (or `-90`, `180`).
