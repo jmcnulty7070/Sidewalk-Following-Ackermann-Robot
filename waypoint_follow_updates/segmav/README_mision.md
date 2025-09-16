@@ -12,7 +12,13 @@ This README gives you **start-to-finish** steps (8th-grade level), the **exact c
 - **LDLiDAR driver** — publishes `/scan` in ROS  
 - **LiDAR→MAVLink bridge** — turns `/scan` into `OBSTACLE_DISTANCE` messages  
 - **SegMAV** — sends small **velocity nudges** (stay on sidewalk)  
-- **GUIDED runner** — pulls the mission from the FC and walks waypoints using Rover-friendly commands  
+- **GKeep avoidance on, but not overbearing:
+
+AVOID_ENABLE=1, OA_TYPE=1 (BendyRuler), AVOID_MARGIN≈0.30 m (≈1 ft).
+
+If it’s still too cautious, lower AVOID_MARGIN a bit (e.g., 0.20–0.25 m).
+
+Worst case for testing: set OA_TYPE=0 to disable avoidance temporarily (but then you rely only on SegMAV + mission runner).UIDED runner** — pulls the mission from the FC and walks waypoints using Rover-friendly commands  
 
 ---
 
