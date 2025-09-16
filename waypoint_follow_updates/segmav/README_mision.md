@@ -42,7 +42,9 @@ Port    = 14550
 
 
 chmod +x ~/segmav/scan_to_obstacle_pymav.py
+
 chmod +x ~/segmav/guided_waypoint_runner_pymav.py
+
 chmod +x ~/segmav/scan_to_obstacle_pymav.py
 
 
