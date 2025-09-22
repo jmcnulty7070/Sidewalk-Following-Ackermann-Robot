@@ -1,0 +1,134 @@
+How to make the script executable (and run it)
+
+Save the file (it already has a #!/usr/bin/env python3 shebang).
+
+Mark it executable:
+
+chmod +x ~/segmav/segmav_one_process.py
+
+Run it (example, using your hubs & Astra symlink):
+
+~/segmav/segmav_one_process.py \
+  v4l2:///dev/astra_rgb display://0 \
+  --tx-hub udpout:127.0.0.1:14555 \
+  --rx-hub udpin:0.0.0.0:14601 \
+  --nudge-hz 5.0 --gps-weight 0.5 --vel 0.6 \
+  --max-angle 30 --lower-crop 0.45 \
+  --l1 3.0 --xtrack-cap-m 1.0 --switch-ahead-m 0.5 --wp-cap-radius 6.0
+
+Put the rover in GUIDED and arm.
+
+RC5 High → SegMAV transmits BODY_NED velocities.
+RC5 Mid/Low → no TX (preview/listen only).
+
+Hotkeys (in the terminal running the script):
+
+r → Refetch mission + params (WP_SPEED, WP_RADIUS), reset to first WP.
+
+p → Pause/resume TX (soft gate) without touching RC5.
+
+q → Quit cleanly.
+
+HUD: window title shows TX state, RC5, WP index & distance, current speed, sidewalk width factor, lateral offset, and OA minimum distance.
+
+
+
+
+Tip: if the shell says “permission denied,” double-check the chmod path; if it says “command not found,” you likely missed the ./ or full path — run with ~/segmav/segmav_one_process.py … or python3 ~/segmav/segmav_one_process.py ….
+
+1) Load your Mission Planner waypoints
+
+On start (and whenever you press r), it pulls the full mission from the FCU.
+
+For each item it records: (lat, lon, acceptance radius).
+
+If the mission item didn’t specify a radius, it uses WP_RADIUS (or 1.5 m fallback).
+
+2) Pick the “active” waypoint and advance automatically
+
+Each control tick it computes distance & bearing from the rover’s current GPS to the active waypoint.
+
+If distance ≤ max(0.5 m, acceptance_radius), it advances to the next waypoint (up to a few per tick—so it won’t stall if you start inside a cluster).
+
+When it reaches the final item, it holds that last target (no wrap-around).
+
+3) Build the waypoint vector (global N/E)
+
+From the bearing to the active WP it computes a unit direction vector in the world frame (N/E).
+Call this wp_vec.
+
+4) Compute the sidewalk vector from segmentation
+
+It runs the Astra through Jetson-Inference (Cityscapes) and finds the center of the sidewalk/road in the lower portion of the image.
+
+The lateral offset of that center from image center becomes a small heading correction (bounded by --max-angle, default 30°).
+That yields a unit sidewalk vector in the world frame (N/E).
+Call this seg_vec, and it also produces a width factor (0..1) based on how “wide” the sidewalk looks.
+
+5) Blend waypoint and sidewalk vectors
+
+With --gps-weight (default 0.5) it blends:
+
+blend = normalize( (1 - gps_weight) * wp_vec + gps_weight * seg_vec )
+
+Intuition:
+
+0.3 → prioritize waypoint track (looser sidewalk clamp)
+
+0.7 → hug sidewalk centerline more tightly (still progressing to the waypoint)
+
+6) Choose speed (and auto-slow)
+
+Actual command speed is the product of:
+
+Base speed = WP_SPEED (if set) else --vel
+
+Width scaling (narrow sidewalk → slower)
+
+Near-waypoint scaling (within ~4 m it feather-brakes to ~30%)
+
+Proximity scaling from OBSTACLE_DISTANCE (e.g., 0.4–1.2 m → 0–100%)
+
+So even if waypoints are straight, the rover naturally slows for narrow sidewalk, close turns, or nearby obstacles.
+
+7) Convert to body frame and transmit
+
+Using current yaw, it rotates blend from world (N/E) to BODY_NED and sends SET_POSITION_TARGET_LOCAL_NED with velocity-only mask at --nudge-hz (default 5 Hz).
+
+Gating:
+
+RC5 High → TX ON
+
+RC5 Mid/Low → TX silent (no zero-vel spam)
+
+p hotkey → soft pause/resume TX
+
+If vision is disabled (--no-vision) or temporarily fails a frame, it falls back to waypoint-only for that tick.
+
+8) Refetch on the fly
+
+Upload a new mission in Mission Planner → press r in the script’s terminal:
+
+It re-reads WP_SPEED/WP_RADIUS
+
+Re-loads the mission
+
+Resets to the first waypoint
+
+What this means in practice
+
+Put waypoints roughly down the sidewalk.
+
+The rover will head toward the next waypoint, but the segmentation keeps it centered on the sidewalk—so it doesn’t drift over lawns or into the street even if the waypoint line is slightly off.
+
+If the sidewalk curves, the segmentation vector gently biases the heading to stay on the concrete, while the waypoint vector ensures forward progress and eventual waypoint capture.
+
+Tuning cheatsheet
+
+--gps-weight: start 0.5; raise if you want tighter sidewalk hugging.
+
+--max-angle: cap the sideways correction from vision (default 30°).
+
+WP_SPEED / --vel: set a comfortable cruise; the script will auto-slow when needed.
+
+Acceptance radius: set in each mission item (param2) or use WP_RADIUS globally. Too small → “orbiting” a point; 1.0–2.0 m works well for sidewalks.
