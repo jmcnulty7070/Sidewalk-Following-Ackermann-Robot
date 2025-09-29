@@ -1,4 +1,4 @@
-# 🚗 Sidewalk-Following Ackermann Robot (Jetson + Pixhawk + Camera + LiDAR)
+# 🚗 THIS IS A Work in progress. I was not able to acheive my goals because the FC used custom mission planner and did nto accept the "steering commands". Sidewalk-Following Ackermann Robot (Jetson + Pixhawk + Camera + LiDAR)
 
 This robot drives on sidewalks by following GPS waypoints, using a camera to stay centered on the sidewalk, and avoiding obstacles with LiDAR (Bendy Ruler). It runs on Jetson Nano, Pixhawk Crossflight, and ROS/MAVROS.
 
