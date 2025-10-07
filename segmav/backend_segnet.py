@@ -5,7 +5,11 @@ import jetson.inference
 import jetson.utils
 
 class SegNetBackend:
-    def __init__(self, network='fcn-resnet18-cityscapes', class_id=8, threshold=0.5):
+    """
+    Jetson-Inference segNet backend.
+    Returns a binary mask (uint8 0/255) for the selected class_id (Cityscapes: road=7, sidewalk=8).
+    """
+    def __init__(self, network="fcn-resnet18-cityscapes", class_id=8, threshold=0.5):
         self.net = jetson.inference.segNet(network)
         self.class_id = int(class_id)
         self.threshold = float(threshold)
@@ -15,4 +19,5 @@ class SegNetBackend:
         cuda_img = jetson.utils.cudaFromNumpy(rgba)
         class_mask_cuda = self.net.Segment(cuda_img)
         class_mask = jetson.utils.cudaToNumpy(class_mask_cuda).astype(np.uint8)
-        return ((class_mask == self.class_id).astype(np.uint8) * 255)
+        mask = (class_mask == self.class_id).astype(np.uint8) * 255
+        return mask
